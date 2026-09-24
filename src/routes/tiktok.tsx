@@ -72,7 +72,8 @@ function TikTokPage() {
     loadingRef.current = true; setLoading(true); setError(false);
     try {
       const t = tasteRef.current;
-      const res = await search({ data: { topics: topics ?? nextTopics(t) } });
+      let res = await search({ data: { topics: topics ?? nextTopics(t) } });
+      if (!res.length) res = await search({ data: { topics: ["funny", "trending", "pets"] } });
       const seen = new Set(t.seen);
       setVideos((prev) => {
         const have = new Set(replace ? [] : prev.map((v) => v.id));
@@ -182,7 +183,7 @@ function TikTokPage() {
           </>
         ) : loading ? <p className="text-muted-foreground">Building your feed…</p>
           : error ? <Button onClick={() => loadMore()}>Couldn't load — try again</Button>
-          : <p className="text-muted-foreground">No TikToks found. Try another search.</p>}
+          : <Button onClick={() => loadMore(undefined, true)}>No TikToks found — reload feed</Button>}
       </div>
       <p className="pb-3 text-center text-xs text-muted-foreground">Scroll beside the video, use the arrows, or press ↑ ↓. All videos belong to their creators on TikTok. Not affiliated with TikTok.</p>
     </div>
