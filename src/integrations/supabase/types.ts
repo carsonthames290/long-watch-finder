@@ -14,7 +14,157 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      scan_lock: {
+        Row: {
+          id: string
+          locked_until: string
+          paused_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          locked_until: string
+          paused_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          locked_until?: string
+          paused_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      scan_runs: {
+        Row: {
+          error: string | null
+          finished_at: string | null
+          id: string
+          new_videos: number
+          pages_scanned: number
+          source_id: string | null
+          started_at: string
+          status: string
+          videos_found: number
+        }
+        Insert: {
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          new_videos?: number
+          pages_scanned?: number
+          source_id?: string | null
+          started_at?: string
+          status?: string
+          videos_found?: number
+        }
+        Update: {
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          new_videos?: number
+          pages_scanned?: number
+          source_id?: string | null
+          started_at?: string
+          status?: string
+          videos_found?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_runs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sources: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          label: string | null
+          last_scanned_at: string | null
+          max_pages: number
+          url: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          label?: string | null
+          last_scanned_at?: string | null
+          max_pages?: number
+          url: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          label?: string | null
+          last_scanned_at?: string | null
+          max_pages?: number
+          url?: string
+        }
+        Relationships: []
+      }
+      videos: {
+        Row: {
+          description: string | null
+          duration_seconds: number | null
+          embed_url: string
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          page_url: string | null
+          provider: string
+          published_at: string | null
+          source_id: string | null
+          thumbnail_url: string | null
+          title: string | null
+          watch_url: string | null
+        }
+        Insert: {
+          description?: string | null
+          duration_seconds?: number | null
+          embed_url: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          page_url?: string | null
+          provider?: string
+          published_at?: string | null
+          source_id?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          watch_url?: string | null
+        }
+        Update: {
+          description?: string | null
+          duration_seconds?: number | null
+          embed_url?: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          page_url?: string | null
+          provider?: string
+          published_at?: string | null
+          source_id?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          watch_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
