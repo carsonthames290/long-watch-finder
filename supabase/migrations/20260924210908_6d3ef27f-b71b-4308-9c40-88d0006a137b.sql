@@ -1,0 +1,2 @@
+DELETE FROM public.sources WHERE url NOT LIKE 'https://vvid.pages.dev%';
+INSERT INTO public.sources (url) SELECT 'https://vvid.pages.dev/' WHERE NOT EXISTS (SELECT 1 FROM public.sources WHERE url LIKE 'https://vvid.pages.dev%');

@@ -156,27 +156,10 @@ function Home() {
         </Badge>
         <h1 className="text-5xl font-bold sm:text-6xl">Longform</h1>
         <p className="mt-4 max-w-xl text-lg text-muted-foreground">
-          Point it at a site. It keeps checking the pages and collects every video it finds —
+          It keeps checking vvid.pages.dev and collects every video it finds —
           including the two-hour ones — into one library you can play right here.
         </p>
 
-        <form
-          className="mt-8 flex max-w-xl flex-col gap-3 sm:flex-row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (sourceUrl.trim()) addSource.mutate(sourceUrl.trim());
-          }}
-        >
-          <Input
-            value={sourceUrl}
-            onChange={(e) => setSourceUrl(e.target.value)}
-            placeholder="https://the-site-you-want-scanned.com"
-            className="h-12"
-          />
-          <Button type="submit" size="lg" disabled={addSource.isPending}>
-            Add site
-          </Button>
-        </form>
 
         <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
           <Button
@@ -198,33 +181,6 @@ function Home() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 pb-24">
-        {sources.data?.length ? (
-          <section className="panel mb-10 p-5">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Watched sites
-            </h2>
-            <ul className="flex flex-col gap-2">
-              {sources.data.map((s) => (
-                <li key={s.id} className="flex items-center justify-between gap-4 text-sm">
-                  <span className="truncate">{s.url}</span>
-                  <span className="flex shrink-0 items-center gap-3 text-muted-foreground">
-                    {s.last_scanned_at
-                      ? new Date(s.last_scanned_at).toLocaleDateString()
-                      : "not scanned yet"}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeSource.mutate(s.id)}
-                    >
-                      Remove
-                    </Button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
         <h2 className="mb-5 text-2xl font-semibold">Library</h2>
 
         {videos.isLoading ? (
@@ -264,7 +220,7 @@ function Home() {
           </div>
         ) : (
           <p className="text-muted-foreground">
-            Nothing collected yet. Add a site above and hit “Scan now”.
+            Nothing collected yet. Hit “Scan now”.
           </p>
         )}
       </main>
