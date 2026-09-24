@@ -36,7 +36,7 @@ export const searchYouTube = createServerFn({ method: "GET" })
       }
       for (const k in n) walk(n[k]);
     };
-    walk(JSON.parse(m[1]));
+    walk(JSON.parse(m[1]!));
     return out;
   });
 
@@ -49,9 +49,10 @@ export const searchTikTok = createServerFn({ method: "GET" })
     const out: TtVideo[] = [];
     for (const r of results) {
       const m = r.url.match(/tiktok\.com\/@([^/?#]+)\/video\/(\d+)/);
-      if (!m || seen.has(m[2])) continue;
-      seen.add(m[2]);
-      out.push({ id: m[2], author: m[1], url: `https://www.tiktok.com/@${m[1]}/video/${m[2]}`, title: r.title ?? "" });
+      const author = m?.[1], id = m?.[2];
+      if (!author || !id || seen.has(id)) continue;
+      seen.add(id);
+      out.push({ id, author, url: `https://www.tiktok.com/@${author}/video/${id}`, title: r.title ?? "" });
     }
     return out;
   });
