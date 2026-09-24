@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 export type YtVideo = { id: string; title: string; channel: string; channelUrl: string | null; thumbnail: string; duration: string | null; views: string | null };
-export type TtVideo = { id: string; author: string; url: string; title: string };
+export type TtVideo = { id: string; author: string; url: string; title: string; topic: string };
 
 const q = (d: unknown) => z.object({ query: z.string().trim().min(1).max(120) }).parse(d);
 
@@ -41,18 +41,34 @@ export const searchYouTube = createServerFn({ method: "GET" })
   });
 
 export const searchTikTok = createServerFn({ method: "GET" })
-  .inputValidator(q)
+  .inputValidator((d: unknown) => z.object({ topics: z.array(z.string().trim().min(1).max(80)).min(1).max(5) }).parse(d))
   .handler(async ({ data }): Promise<TtVideo[]> => {
     const { firecrawlSearch } = await import("./firecrawl.server");
-    const results = await firecrawlSearch(`site:tiktok.com ${data.query}`, 25);
+    const lists = await Promise.all(
+      data.topics.map(async (topic) => {
+        try {
+          const r = await firecrawlSearch(`site:tiktok.com ${topic}`, 20);
+          return r.map((x) => ({ ...x, topic }));
+        } catch (e) {
+          console.error("tiktok search failed", topic, e);
+          return [];
+        }
+      }),
+    );
     const seen = new Set<string>();
     const out: TtVideo[] = [];
-    for (const r of results) {
-      const m = r.url.match(/tiktok\.com\/@([^/?#]+)\/video\/(\d+)/);
-      const author = m?.[1], id = m?.[2];
-      if (!author || !id || seen.has(id)) continue;
-      seen.add(id);
-      out.push({ id, author, url: `https://www.tiktok.com/@${author}/video/${id}`, title: r.title ?? "" });
+    // interleave topics so the feed is mixed
+    const max = Math.max(0, ...lists.map((l) => l.length));
+    for (let i = 0; i < max; i++) {
+      for (const l of lists) {
+        const r = l[i];
+        if (!r) continue;
+        const m = r.url.match(/tiktok\.com\/@([^/?#]+)\/video\/(\d+)/);
+        const author = m?.[1], id = m?.[2];
+        if (!author || !id || seen.has(id)) continue;
+        seen.add(id);
+        out.push({ id, author, url: `https://www.tiktok.com/@${author}/video/${id}`, title: r.title ?? "", topic: r.topic });
+      }
     }
     return out;
   });
