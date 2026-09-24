@@ -44,17 +44,24 @@ export const searchTikTok = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ topics: z.array(z.string().trim().min(1).max(80)).min(1).max(5) }).parse(d))
   .handler(async ({ data }): Promise<TtVideo[]> => {
     const { firecrawlSearch } = await import("./firecrawl.server");
-    const lists = await Promise.all(
-      data.topics.map(async (topic) => {
+    const fetchTopic = async (topic: string) => {
+      for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const r = await firecrawlSearch(`site:tiktok.com ${topic}`, 20);
           return r.map((x) => ({ ...x, topic }));
         } catch (e) {
-          console.error("tiktok search failed", topic, e);
-          return [];
+          console.error("tiktok search failed", topic, attempt, e);
+          await new Promise((res) => setTimeout(res, 800));
         }
-      }),
-    );
+      }
+      return [];
+    };
+    let lists = await Promise.all(data.topics.map(fetchTopic));
+    const hasVideo = (l: { url: string }[]) => l.some((x) => /tiktok\.com\/@[^/]+\/video\/\d+/.test(x.url));
+    if (!lists.some(hasVideo)) {
+      // fallback so the feed is never empty
+      lists = [await fetchTopic("funny"), await fetchTopic("trending")];
+    }
     const seen = new Set<string>();
     const out: TtVideo[] = [];
     // interleave topics so the feed is mixed
