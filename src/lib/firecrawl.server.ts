@@ -64,3 +64,10 @@ export async function firecrawlScrape(url: string): Promise<ScrapedPage> {
     description: doc?.metadata?.description,
   };
 }
+
+export async function firecrawlSearch(query: string, limit = 20): Promise<{ url: string; title?: string; description?: string }[]> {
+  const data = await call("/search", { query, limit });
+  const d = data?.data;
+  const web = Array.isArray(d) ? d : Array.isArray(d?.web) ? d.web : [];
+  return web.filter((r: any) => typeof r?.url === "string");
+}

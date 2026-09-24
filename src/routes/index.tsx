@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { SiteNav } from "@/components/SiteNav";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -150,6 +151,7 @@ function Home() {
   return (
     <div className="min-h-screen">
       <Toaster />
+      <SiteNav />
       <header className="mx-auto max-w-6xl px-6 pt-16 pb-10">
         <Badge variant="outline" className="mb-5 border-primary/40 text-primary">
           Always watching
