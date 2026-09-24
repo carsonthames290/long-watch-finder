@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      pages: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          last_scanned_at: string | null
+          source_id: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          last_scanned_at?: string | null
+          source_id: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          last_scanned_at?: string | null
+          source_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pages_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scan_lock: {
         Row: {
           id: string
