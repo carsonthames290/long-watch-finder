@@ -45,9 +45,11 @@ function parse(md: string): YtVideo[] {
     let channel = "Unknown channel";
     let channelUrl: string | null = null;
     let views: string | null = null;
-    for (let a = i + 1; a < Math.min(lines.length, i + 8); a++) {
-      const c = lines[a]!.match(/^\[(.+?)\]\((https:\/\/www\.youtube\.com\/(?:@|channel\/)[^)]+)\)/);
-      if (c && channelUrl === null) {
+    for (let a = i + 1; a < Math.min(lines.length, i + 14); a++) {
+      const c =
+        lines[a]!.match(/^\[(.+?)\]\((https:\/\/www\.youtube\.com\/(?:@|channel\/)[^)]+)\)/) ??
+        lines[a]!.match(/\[([^\]]{1,60})\]\((https:\/\/www\.youtube\.com\/(?:@|channel\/)[^)]+)\)/);
+      if (c && channelUrl === null && !/^!/.test(c[1]!)) {
         channel = c[1]!;
         channelUrl = c[2]!;
       }

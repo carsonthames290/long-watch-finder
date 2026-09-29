@@ -8,3 +8,7 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+## Architecture
+
+- The app is 100% client-side (no server functions, no Supabase, no API keys) so it can be hosted statically on Cloudflare Pages: YouTube search runs in the browser via the CORS reader in `src/lib/yt-client.ts`, the TikTok feed uses the curated catalog in `src/lib/catalog.ts`, and likes/favorites live in `localStorage`.
