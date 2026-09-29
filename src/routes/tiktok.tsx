@@ -174,7 +174,7 @@ function TikTokPage() {
               <div className="aspect-[9/16] h-[calc(100%-2rem)] max-w-full overflow-hidden rounded-2xl bg-muted">
                 <iframe
                   key={current.id}
-                  src={`https://www.tiktok.com/player/v1/${current.id}?autoplay=1&loop=1&rel=0&description=1&music_info=1`}
+                  src={`https://www.tiktok.com/player/v1/${current.id}?autoplay=1&loop=1&rel=0&description=0&music_info=0&native_context_menu=0&closed_caption=0`}
                   className="h-full w-full"
                   allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
                   allowFullScreen
