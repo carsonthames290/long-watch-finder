@@ -25,7 +25,7 @@ function parse(md: string): YtVideo[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    const head = line.match(/^###\s+\[(.+?)\]\(https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})/);
+    const head = line.match(/^###\s+\[(.+?)\]\(https:\/\/www\.youtube\.com\/(?:watch\?v=|shorts\/)([\w-]{11})/);
     if (!head) continue;
     const id = head[2]!;
     if (seen.has(id)) continue;
