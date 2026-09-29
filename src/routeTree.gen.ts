@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TiktokRouteImport } from './routes/tiktok'
 import { Route as YoutubeRouteImport } from './routes/youtube'
-import { Route as ApiPublicHooksScanRouteImport } from './routes/api/public/hooks/scan'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,44 +28,35 @@ const YoutubeRoute = YoutubeRouteImport.update({
   path: '/youtube',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicHooksScanRoute = ApiPublicHooksScanRouteImport.update({
-  id: '/api/public/hooks/scan',
-  path: '/api/public/hooks/scan',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/tiktok': typeof TiktokRoute
   '/youtube': typeof YoutubeRoute
-  '/api/public/hooks/scan': typeof ApiPublicHooksScanRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/tiktok': typeof TiktokRoute
   '/youtube': typeof YoutubeRoute
-  '/api/public/hooks/scan': typeof ApiPublicHooksScanRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/tiktok': typeof TiktokRoute
   '/youtube': typeof YoutubeRoute
-  '/api/public/hooks/scan': typeof ApiPublicHooksScanRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/tiktok' | '/youtube' | '/api/public/hooks/scan'
+  fullPaths: '/' | '/tiktok' | '/youtube'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/tiktok' | '/youtube' | '/api/public/hooks/scan'
-  id: '__root__' | '/' | '/tiktok' | '/youtube' | '/api/public/hooks/scan'
+  to: '/' | '/tiktok' | '/youtube'
+  id: '__root__' | '/' | '/tiktok' | '/youtube'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TiktokRoute: typeof TiktokRoute
   YoutubeRoute: typeof YoutubeRoute
-  ApiPublicHooksScanRoute: typeof ApiPublicHooksScanRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -92,13 +82,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof YoutubeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/scan': {
-      id: '/api/public/hooks/scan'
-      path: '/api/public/hooks/scan'
-      fullPath: '/api/public/hooks/scan'
-      preLoaderRoute: typeof ApiPublicHooksScanRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -106,7 +89,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TiktokRoute: TiktokRoute,
   YoutubeRoute: YoutubeRoute,
-  ApiPublicHooksScanRoute: ApiPublicHooksScanRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
