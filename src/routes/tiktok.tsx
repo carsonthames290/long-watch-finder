@@ -1,23 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SiteNav } from "@/components/SiteNav";
 import { ChevronUp, ChevronDown, Heart, ThumbsDown } from "lucide-react";
-import {
-  TIKTOK_CREATORS,
-  TIKTOK_TAGS,
-  rankCreators,
-  readTaste,
-  writeTaste,
-  emptyTaste,
-  tiktokParts,
-  isHandle,
-  readFavorites,
-  writeFavorites,
-  type Creator,
-  type Taste,
-} from "@/lib/catalog";
+import { readTaste, writeTaste, emptyTaste, tiktokParts, readFavorites, writeFavorites, type Taste } from "@/lib/catalog";
+import { fetchTag, TT_TAGS, type TtVideo } from "@/lib/tt-client";
 
 export const Route = createFileRoute("/tiktok")({
   head: () => ({
@@ -33,83 +21,109 @@ export const Route = createFileRoute("/tiktok")({
   component: TikTokPage,
 });
 
-type Pinned = { author: string; id: string } | null;
+function shuffle<T>(a: T[]) {
+  const b = [...a];
+  for (let i = b.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [b[i], b[j]] = [b[j]!, b[i]!];
+  }
+  return b;
+}
+
+/** Pick tags weighted by taste, plus one random discovery tag. */
+function pickTags(t: Taste, n = 2) {
+  const scored = TT_TAGS.map((tag) => ({ tag, s: (t.tags[tag] ?? 0) + Math.random() * 3 }))
+    .filter((x) => (t.tags[x.tag] ?? 0) > -4)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, n)
+    .map((x) => x.tag);
+  const rest = TT_TAGS.filter((x) => !scored.includes(x));
+  return [...scored, rest[Math.floor(Math.random() * rest.length)]!];
+}
 
 function TikTokPage() {
   const [taste, setTaste] = useState<Taste>(emptyTaste);
-  const [order, setOrder] = useState<Creator[]>([]);
+  const [feed, setFeed] = useState<TtVideo[]>([]);
   const [index, setIndex] = useState(0);
-  const [tag, setTag] = useState("All");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState("");
-  const [pinned, setPinned] = useState<Pinned>(null);
+  const [liked, setLiked] = useState<Set<string>>(new Set());
+  const seen = useRef(new Set<string>());
+  const busy = useRef(false);
   const wheelLock = useRef(0);
   const touchY = useRef<number | null>(null);
+
+  const load = useCallback(async (tags: string[], replace = false) => {
+    if (busy.current) return;
+    busy.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      const results = await Promise.allSettled(tags.map(fetchTag));
+      const t = readTaste();
+      const fresh = results
+        .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
+        .filter((v) => !seen.current.has(v.id) && (t.creators[v.author] ?? 0) > -3);
+      const ranked = shuffle(fresh).sort((a, b) => (t.creators[b.author] ?? 0) - (t.creators[a.author] ?? 0));
+      ranked.forEach((v) => seen.current.add(v.id));
+      if (replace) { setFeed(ranked); setIndex(0); } else setFeed((f) => [...f, ...ranked]);
+      if (!ranked.length) setError("Couldn't load videos right now. Try again.");
+    } finally {
+      busy.current = false;
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const t = readTaste();
     setTaste(t);
-    setOrder(rankCreators(t));
-  }, []);
+    void load(pickTags(t), true);
+  }, [load]);
 
-  const feed = useMemo(
-    () => (tag === "All" ? order : order.filter((c) => c.tag === tag)),
-    [order, tag],
-  );
-  const current = feed[Math.min(index, Math.max(0, feed.length - 1))];
+  // auto-load more near the end
+  useEffect(() => {
+    if (feed.length && index >= feed.length - 5) void load(pickTags(readTaste()));
+  }, [index, feed.length, load]);
 
-  const save = (t: Taste) => {
-    setTaste(t);
-    writeTaste(t);
-  };
+  const current = feed[index];
 
-  const go = useCallback(
-    (d: number) => {
-      setPinned(null);
-      setIndex((i) => Math.max(0, Math.min(feed.length - 1, i + d)));
-    },
-    [feed.length],
-  );
+  const go = useCallback((d: number) => {
+    setIndex((i) => Math.max(0, Math.min(feed.length - 1, i + d)));
+  }, [feed.length]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
-      if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); go(1); }
-      if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); go(-1); }
+      if (e.key === "ArrowDown") { e.preventDefault(); go(1); }
+      if (e.key === "ArrowUp") { e.preventDefault(); go(-1); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [go]);
 
-  const onWheel = (e: React.WheelEvent) => {
-    const now = Date.now();
-    if (now - wheelLock.current < 600 || Math.abs(e.deltaY) < 20) return;
-    wheelLock.current = now;
-    go(e.deltaY > 0 ? 1 : -1);
-  };
+  const save = (t: Taste) => { setTaste(t); writeTaste(t); };
 
   const like = () => {
     if (!current) return;
     save({
-      creators: { ...taste.creators, [current.handle]: (taste.creators[current.handle] ?? 0) + 3 },
+      creators: { ...taste.creators, [current.author]: (taste.creators[current.author] ?? 0) + 3 },
       tags: { ...taste.tags, [current.tag]: (taste.tags[current.tag] ?? 0) + 2 },
     });
+    setLiked((s) => new Set(s).add(current.id));
     const favs = readFavorites();
-    if (!favs.some((f) => f.id === current.handle)) {
-      writeFavorites([
-        { kind: "tiktok", id: current.handle, author: current.name, title: `${current.name} on TikTok`, url: `https://www.tiktok.com/@${current.handle}` },
-        ...favs,
-      ]);
+    if (!favs.some((f) => f.id === current.id)) {
+      writeFavorites([{ kind: "tiktok", id: current.id, author: current.author, title: `TikTok by @${current.author}`, url: `https://www.tiktok.com/@${current.author}/video/${current.id}` }, ...favs]);
     }
   };
 
   const notInterested = () => {
     if (!current) return;
-    const next: Taste = {
-      creators: { ...taste.creators, [current.handle]: (taste.creators[current.handle] ?? 0) - 4 },
+    save({
+      creators: { ...taste.creators, [current.author]: (taste.creators[current.author] ?? 0) - 4 },
       tags: { ...taste.tags, [current.tag]: (taste.tags[current.tag] ?? 0) - 1 },
-    };
-    save(next);
-    setOrder((o) => o.filter((c) => c.handle !== current.handle));
+    });
+    setFeed((f) => f.filter((v) => v.author !== current.author || f.indexOf(v) < index));
   };
 
   const submit = (raw: string) => {
@@ -117,76 +131,36 @@ function TikTokPage() {
     if (!q) return;
     const parts = tiktokParts(q);
     if (parts) {
-      setPinned(parts);
+      setFeed((f) => [...f.slice(0, index + 1), { ...parts, tag: "link" }, ...f.slice(index + 1)]);
+      setIndex((i) => (feed.length ? i + 1 : 0));
       return;
     }
-    const handle = q.replace(/^@/, "").replace(/^.*tiktok\.com\/@/, "").split(/[/?#]/)[0] ?? "";
-    if (isHandle(handle)) {
-      setPinned(null);
-      setOrder((o) => [{ handle, name: `@${handle}`, tag: "Search" }, ...o.filter((c) => c.handle !== handle)]);
-      setIndex(0);
-      setTag("All");
-      return;
-    }
-    const lower = q.toLowerCase();
-    const matches = TIKTOK_CREATORS.filter((c) => c.name.toLowerCase().includes(lower) || c.tag.toLowerCase().includes(lower));
-    if (matches.length) {
-      setPinned(null);
-      setOrder([...matches, ...rankCreators(taste).filter((c) => !matches.includes(c))]);
-      setIndex(0);
-      setTag("All");
-    }
+    seen.current.clear();
+    void load([q.replace(/^#/, "")], true);
   };
 
-  const liked = current ? (taste.creators[current.handle] ?? 0) > 0 : false;
   const topTags = Object.entries(taste.tags).filter(([, w]) => w > 0).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k);
-
-  const src = pinned
-    ? `https://www.tiktok.com/player/v1/${pinned.id}?autoplay=1&rel=0`
-    : current
-      ? `https://www.tiktok.com/embed/@${current.handle}`
-      : null;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <SiteNav />
-
-      <form
-        className="mx-auto mt-3 flex w-full max-w-md gap-2 px-6"
-        onSubmit={(e) => { e.preventDefault(); submit(input); }}
-      >
-        <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="A creator, a topic, or a TikTok link" />
+      <form className="mx-auto mt-3 flex w-full max-w-md gap-2 px-6" onSubmit={(e) => { e.preventDefault(); submit(input); }}>
+        <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="A topic (e.g. cats) or a TikTok link" />
         <Button type="submit">Go</Button>
-        {(input || pinned) && (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => { setInput(""); setPinned(null); setOrder(rankCreators(taste)); setIndex(0); }}
-          >
-            For You
-          </Button>
-        )}
+        <Button type="button" variant="ghost" onClick={() => { setInput(""); seen.current.clear(); void load(pickTags(taste), true); }}>For You</Button>
       </form>
-
-      <div className="mx-auto mt-2 flex max-w-3xl flex-wrap justify-center gap-1.5 px-6">
-        {TIKTOK_TAGS.map((t) => (
-          <button
-            key={t}
-            onClick={() => { setTag(t); setIndex(0); setPinned(null); }}
-            className={`rounded-full px-2.5 py-1 text-xs ${t === tag ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
       <p className="mt-2 text-center text-xs text-muted-foreground">
-        {topTags.length ? `Learning you like: ${topTags.join(", ")}` : "Like what you enjoy and your feed reorders itself."}
+        {topTags.length ? `Learning you like: ${topTags.join(", ")}` : "Like videos and your feed learns what you enjoy."}
       </p>
 
       <div
         className="relative flex flex-1 items-center justify-center gap-4 overflow-hidden px-4 py-3"
-        onWheel={onWheel}
+        onWheel={(e) => {
+          const now = Date.now();
+          if (now - wheelLock.current < 600 || Math.abs(e.deltaY) < 20) return;
+          wheelLock.current = now;
+          go(e.deltaY > 0 ? 1 : -1);
+        }}
         onTouchStart={(e) => (touchY.current = e.touches[0]?.clientY ?? null)}
         onTouchEnd={(e) => {
           const s = touchY.current, end = e.changedTouches[0]?.clientY;
@@ -194,50 +168,42 @@ function TikTokPage() {
           touchY.current = null;
         }}
       >
-        {src ? (
+        {current ? (
           <>
             <div className="flex h-full flex-col items-center gap-2">
               <div className="aspect-[9/16] h-[calc(100%-2rem)] max-w-full overflow-hidden rounded-2xl bg-muted">
                 <iframe
-                  key={src}
-                  src={src}
+                  key={current.id}
+                  src={`https://www.tiktok.com/player/v1/${current.id}?autoplay=1&loop=1&rel=0&description=1&music_info=1`}
                   className="h-full w-full"
-                  allow="autoplay; fullscreen; encrypted-media"
+                  allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
                   allowFullScreen
-                  title={pinned ? `TikTok by @${pinned.author}` : `TikToks by @${current!.handle}`}
+                  title={`TikTok by @${current.author}`}
                 />
               </div>
               <p className="text-sm text-muted-foreground">
-                {pinned ? (
-                  <>
-                    Video by{" "}
-                    <a href={`https://www.tiktok.com/@${pinned.author}`} target="_blank" rel="noreferrer" className="underline hover:text-foreground">@{pinned.author}</a>{" "}
-                    ·{" "}
-                    <a href={`https://www.tiktok.com/@${pinned.author}/video/${pinned.id}`} target="_blank" rel="noreferrer" className="underline hover:text-foreground">View on TikTok</a>
-                  </>
-                ) : (
-                  <>
-                    Videos by{" "}
-                    <a href={`https://www.tiktok.com/@${current!.handle}`} target="_blank" rel="noreferrer" className="underline hover:text-foreground">@{current!.handle}</a>{" "}
-                    · {current!.name} · {current!.tag}
-                  </>
-                )}
+                Video by{" "}
+                <a href={`https://www.tiktok.com/@${current.author}`} target="_blank" rel="noreferrer" className="underline hover:text-foreground">@{current.author}</a>{" "}·{" "}
+                <a href={`https://www.tiktok.com/@${current.author}/video/${current.id}`} target="_blank" rel="noreferrer" className="underline hover:text-foreground">View on TikTok</a>
               </p>
             </div>
-
             <div className="flex flex-col items-center gap-3">
               <Button size="icon" variant="secondary" onClick={() => go(-1)} disabled={index === 0} aria-label="Previous"><ChevronUp /></Button>
-              <Button size="icon" variant={liked ? "default" : "secondary"} onClick={like} aria-label="Like"><Heart className={liked ? "fill-current" : ""} /></Button>
+              <Button size="icon" variant={liked.has(current.id) ? "default" : "secondary"} onClick={like} aria-label="Like"><Heart className={liked.has(current.id) ? "fill-current" : ""} /></Button>
               <Button size="icon" variant="secondary" onClick={notInterested} aria-label="Not interested"><ThumbsDown /></Button>
               <Button size="icon" variant="secondary" onClick={() => go(1)} disabled={index >= feed.length - 1} aria-label="Next"><ChevronDown /></Button>
-              <span className="text-xs text-muted-foreground">{Math.min(index + 1, feed.length)}/{feed.length}</span>
+              <span className="text-xs text-muted-foreground">{index + 1}/{feed.length}</span>
             </div>
           </>
+        ) : loading ? (
+          <p className="text-sm text-muted-foreground">Loading your feed…</p>
         ) : (
-          <Button onClick={() => { setOrder(rankCreators(taste)); setIndex(0); }}>Reload feed</Button>
+          <div className="flex flex-col items-center gap-2">
+            {error && <p className="text-sm text-muted-foreground">{error}</p>}
+            <Button onClick={() => void load(pickTags(taste), true)}>Reload feed</Button>
+          </div>
         )}
       </div>
-
       <p className="pb-3 text-center text-xs text-muted-foreground">
         Scroll beside the video, use the arrows, or press ↑ ↓. All videos belong to their creators on TikTok. Not affiliated with TikTok.
       </p>
